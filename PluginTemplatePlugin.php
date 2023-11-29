@@ -22,8 +22,12 @@ use PKP\linkAction\request\AjaxModal;
 use PKP\plugins\GenericPlugin;
 use PKP\plugins\Hook;
 
+use APP\facades\Repo;
+
 class PluginTemplatePlugin extends GenericPlugin
 {
+
+    protected $newProperty = 'PluginTemplatePlugin::lastTouch';
 
     /**
      * @copydoc GenericPlugin::register()
@@ -34,8 +38,36 @@ class PluginTemplatePlugin extends GenericPlugin
         if ($success && $this->getEnabled()) {
             // Display the publication statement on the article details page
             Hook::add('Templates::Article::Main', [$this, 'addPublicationStatement']);
+            Hook::add('Schema::get::user', $this->addUserDatestamp(...));
+            Hook::add('LoadHandler', $this->handlePageLoad(...));
         }
         return $success;
+    }
+
+    public function addUserDatestamp($hook, $args) {
+      $user = $args[0];
+
+      $user->properties->{$this->newProperty} = (object) [
+        'type' => 'string',
+        'apiSummary' => false,
+        'multilingual' => false,
+        'validation' => ['nullable']
+      ];
+
+      return false;
+    }
+
+    public function handlePageLoad($hook, $args) {
+      $user = Application::get()->getRequest()->getUser();
+      if ($user) {
+        $user->setData($this->newProperty, $args[0].' and '.$args[1].' at '.date('c'));
+        Repo::user()->edit($user);
+      }
+      return false;
+    }
+
+    public function getSeq() {
+      return -999;
     }
 
     /**
